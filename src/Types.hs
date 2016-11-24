@@ -1,13 +1,18 @@
-module Model where
+module Types where
 
+import Data.ByteString (ByteString)
 import Data.IntMap (IntMap)
+import qualified Data.IntMap as M
 
 type UserId   = Int
-type UserNick = String
+type UserNick = ByteString
 type Users    = IntMap UserNick
 
 data ServerState
   = ServerState { users :: Users }
+
+initialServerState :: ServerState
+initialServerState = ServerState { users = M.empty }
 
 data Request
   = Request { from :: UserId
@@ -17,10 +22,11 @@ data Request
 data RequestMessage
   = ReqNick
   | ReqChangeNick UserNick
-  | ReqMessage    String
+  | ReqMessage    ByteString
   | ReqNames
-  | ReqQuit       (Maybe String)
+  | ReqQuit       (Maybe ByteString)
   | ReqKick       UserNick
+  | ReqUnknown
   deriving (Eq, Show)
 
 data Response
@@ -40,12 +46,14 @@ data ResponseMessage
   | NickAccepted
   | NickMalformed
   | NickInUse
+  | MessageAccepted
   | Names [UserNick]
   | QuitAccepted
   | KickAccepted
   | KickUnknown
+  | RequestUnknown
   -- Broadcast messages
-  | Message  UserNick String
+  | Message  UserNick ByteString
   | Joined   UserNick
   | Renamed  UserNick UserNick
   | Gone     UserNick

@@ -13,10 +13,13 @@ cabal-version:       >=1.10
 
 executable nacionlumpen-chat
   main-is:             Main.hs
-  other-modules:       Model,
-                       Controller
+  other-modules:       Types,
+                       ServerLoop,
+                       ResponsePrinter,
+                       RequestParser
   -- other-extensions:    
   build-depends:       base >= 4.9 && < 5,
+                       bytestring,
                        containers,
                        attoparsec,
                        conduit-extra,

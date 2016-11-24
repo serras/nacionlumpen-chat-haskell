@@ -9,11 +9,14 @@ import Conduit
 import Data.Conduit.Network
 import Data.Conduit.TMChan
 
-import Model
-import Controller
+import Types
+import ServerLoop
+import ResponsePrinter
+import RequestParser
 
 main :: IO ()
 main = do
+  putStrLn "Welcome to Nacion Lumpen λchat server 0.1!"
   -- Initialize two channels for the server
   -- * serverIn: server receives requests sent by clients
   -- * serverOut: server sends responses to clients
@@ -22,20 +25,33 @@ main = do
   serverIn  <- newTMChanIO
   serverOut <- newTMChanIO
   -- Start the background server thread
-  forkIO backgroundServer
+  forkIO (backgroundServer serverIn serverOut)
   -- Listen to new connections
-  let settings = serverSettings 1212 "*"
+  putStrLn ("Listening on port " ++ show lISTEN_PORT)
+  let settings = serverSettings lISTEN_PORT "*"
   runTCPServer settings initializeClient
 
-  where
-    -- This part listens to server requests
-    -- and generates the responses
-    backgroundServer :: IO ()
-    backgroundServer = return ()
+lISTEN_PORT :: Int
+lISTEN_PORT = 1212
 
-    -- Initialize two client threads:
-    -- one where the incoming messages are transformed
-    -- into requests for the server, and another where
-    -- responses are sent if appropiate
-    initializeClient :: AppData -> IO ()
-    initializeClient _ = return ()
+-- This part listens to server requests
+-- and generates the responses
+backgroundServer :: TMChan Request -> TMChan Response -> IO ()
+backgroundServer inCh outCh = do
+      -- Wrap TMChan's as conduits
+  let sourceIn = sourceTMChan inCh
+      sinkOut  = sinkTMChan outCh True
+      -- Build pipeline
+      pipeline =    sourceIn 
+                 .| scanlC loop' (initialServerState, [])
+                 .| concatMapC snd  -- get only messages
+                 .| sinkOut
+  -- Start pipeline!
+  runConduit pipeline
+
+-- Initialize two client threads:
+-- one where the incoming messages are transformed
+-- into requests for the server, and another where
+-- responses are sent if appropiate
+initializeClient :: AppData -> IO ()
+initializeClient _ = return ()

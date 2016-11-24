@@ -1,12 +1,18 @@
 {-# language NamedFieldPuns #-}
-module Controller where
+module ServerLoop where
 
 import Control.Applicative
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as M
 
-import Model
+import Types
 
+-- Adapter for use within scanl
+loop' :: (ServerState, [Response]) -> Request -> (ServerState, [Response])
+loop' (s, _) = loop s
+
+-- Defines the basic loop of the server
+-- Each request affects the state and returns zero or more messages
 loop :: ServerState -> Request -> (ServerState, [Response])
 loop s (Request { from, req }) = case req of
 
@@ -24,7 +30,8 @@ loop s (Request { from, req }) = case req of
            , Response Everybody from respMethod ] )
   
   ReqMessage msg -> obtainUserNick $ \nick ->
-    ( s, [ Response Everybody from (Message nick msg) ] )
+    ( s, [ Response (OneUser from) from MessageAccepted
+         , Response Everybody from (Message nick msg) ] )
   
   ReqNames ->
     let usrs = snd <$> M.toList (users s) 
@@ -40,6 +47,8 @@ loop s (Request { from, req }) = case req of
                 , [ Response (OneUser from) from KickAccepted
                   , Response Everybody usr (Gone nick) ] )
     Nothing  -> ( s, [ Response (OneUser from) from KickUnknown ])
+  
+  ReqUnknown -> ( s, [ Response (OneUser from) from RequestUnknown ])
   
   where obtainUserNick :: (UserNick -> a) -> a
         obtainUserNick f = case M.lookup from (users s) of
