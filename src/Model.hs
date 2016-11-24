@@ -35,17 +35,17 @@ data Recipient
   deriving (Eq, Show)
 
 data ResponseMessage
-  = NickIs UserNick
+  = -- Messages for a user
+    NickIs UserNick
+  | NickAccepted
   | NickMalformed
   | NickInUse
-  -- | Names
+  | Names [UserNick]
   | QuitAccepted
   | KickAccepted
   | KickUnknown
   -- Broadcast messages
-  -- They behave differently depending on
-  -- the client which receives it
-  | Message  String
+  | Message  UserNick String
   | Joined   UserNick
   | Renamed  UserNick UserNick
   | Gone     UserNick
