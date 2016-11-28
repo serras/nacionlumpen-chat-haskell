@@ -1,11 +1,17 @@
 {-# language OverloadedStrings #-}
-module ResponsePrinter where
+module ResponsePrinter (printResponse) where
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.Monoid ((<>))
 
 import Types
+
+printResponse :: Response -> ByteString
+printResponse = printRM' . resp
+
+printRM' :: ResponseMessage -> ByteString
+printRM' msg = printRM msg <> "\n"
 
 -- Just get the message as a ByteString
 -- Note: ByteStrings is the type used for

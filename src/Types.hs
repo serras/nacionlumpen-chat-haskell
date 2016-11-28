@@ -58,3 +58,12 @@ data ResponseMessage
   | Renamed  UserNick UserNick
   | Gone     UserNick
   deriving (Eq, Show)
+
+isFinalMessage :: UserId -> Response -> Bool
+isFinalMessage usr (Response Everybody initiator (Gone _))
+  = usr == initiator
+isFinalMessage _ _ = False
+
+isForMe :: UserId -> Response -> Bool
+isForMe usr (Response Everybody   u _) = usr /= u
+isForMe usr (Response (OneUser u) _ _) = usr == u

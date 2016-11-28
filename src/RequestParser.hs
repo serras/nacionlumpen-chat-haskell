@@ -5,39 +5,36 @@ import Control.Applicative
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.Attoparsec.ByteString
+import qualified Data.Attoparsec.ByteString as AP
 
 import Types
 
 parseRequest :: Parser RequestMessage
-parseRequest
-  =   try (ReqChangeNick <$  string "NICK"
-                         <*  space
-                         <*> parseNick
-                         <*  endOfLine)
-  <|> try (ReqNick       <$  string "NICK"
-                         <*  endOfLine)
-  <|> try (ReqMessage    <$  string "MSG"
-                         <*  space
-                         <*> parseMessage
-                         <*  endOfLine)
-  <|> try (ReqNames      <$  string "NAMES"
-                         <*  endOfLine)
-  <|> try (ReqQuit       <$  string "QUIT"
-                         <*> option Nothing (Just <$ space <*> parseMessage)
-                         <*  endOfLine)
-  <|> try (ReqKick       <$  string "KICK"
-                         <*> parseNick
-                         <*  endOfLine)
-  <|> pure ReqUnknown
+parseRequest = newlines *> parseRequest' <* newlines
+
+parseRequest' :: Parser RequestMessage
+parseRequest'
+  =   ReqChangeNick <$  (string "NICK"  <?> "start nick")
+                    <*  space
+                    <*> (parseNick      <?> "new nick")
+  <|> ReqNick       <$  (string "NICK"  <?> "start nick")
+  <|> ReqMessage    <$  (string "MSG"   <?> "start msg")
+                    <*  space
+                    <*> (parseMessage   <?> "msg")
+  <|> ReqNames      <$  (string "NAMES" <?> "start names")
+  <|> ReqQuit       <$  (string "QUIT"  <?> "start quit")
+                    <*> (option Nothing (Just <$ space <*> parseMessage) <?> "bye msg")
+  <|> ReqKick       <$  (string "KICK"  <?> "start kick")
+                    <*> (parseNick      <?> "nick")
 
 parseNick :: Parser UserNick
-parseNick = B.pack <$> many1 (satisfy (notInClass " \n\r"))
+parseNick = takeWhile1 (notInClass " \0\n\r")
 
 parseMessage :: Parser ByteString
-parseMessage = B.pack <$> many1 (satisfy (notInClass "\n\r"))
+parseMessage = takeWhile1 (notInClass "\0\n\r")
 
 space :: Parser ()
-space = skip (== 32)  -- 32 = ASCII code for space
+space = const () <$> string " " <?> "space"
 
-endOfLine :: Parser ()
-endOfLine = skip (inClass "\n\r")
+newlines :: Parser ()
+newlines = const () <$> AP.takeWhile (inClass "\0\n\r") <?> "start of line"
