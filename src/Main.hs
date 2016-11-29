@@ -6,6 +6,7 @@ module Main where
 import Control.Concurrent
 import Control.Concurrent.Async
 import Control.Concurrent.STM
+import Control.Exception
 -- Needed to run the parser
 import Data.Attoparsec.ByteString
 -- Library for data manipulation
@@ -17,9 +18,6 @@ import Data.Conduit.TMChan
 -- Utilities
 import System.Random (randomRIO)
 import qualified Data.ByteString as B
-import Data.Word (Word8)
-
-import Debug.Trace
 
 import Types
 import ServerLoop
@@ -52,9 +50,8 @@ backgroundServer inCh outCh = do
   let sourceIn = sourceTMChan inCh
       sinkOut  = sinkTMChan outCh True
       -- Build pipeline
-      pipeline =    sourceIn 
-                 .| scanlC loop' (initialServerState, [])
-                 .| concatMapC snd  -- get only messages
+      pipeline =    sourceIn
+                 .| concatMapAccumC loop initialServerState
                  .| sinkOut
   -- Start pipeline!
   putStrLn "Starting background server..."
@@ -75,20 +72,34 @@ initializeClient serverIn serverOut app = do
     (,) <$> dupTMChan serverIn <*> dupTMChan serverOut
   -- Start response pipeline
   let rspPipeline =    sourceTMChan responsesCh
-                    .| takeWhileC (not . isFinalMessage clientId)
+                       -- If the connection should be terminated,
+                       -- throw an exception to kill thread
+                    .| mapC (\msg -> if isFinalMessage clientId msg
+                                        then throw EndSocketException
+                                        else msg)
+                       -- Only send messages for me
                     .| filterC (isForMe clientId)
                     .| mapC printResponse
                     .| appSink app
   -- Start request pipeline
   let reqPipeline =    appSource app
-                    .| splitOnUnboundedE isEndOfLine
+                       -- Split incoming messages by newlines
+                    .| splitOnUnboundedE isEndOfLineChar
                     .| filterC (\x -> B.length x > 0)
+                       -- Try to parse, unknown messages are
+                       -- converted into ReqUnknown
                     .| mapC (parseOnly parseRequest)
                     .| mapC (either (const ReqUnknown) id)
+                       -- Decorate with sender information
                     .| mapC (Request clientId)
                     .| sinkTMChan requestsCh True
   concurrently_ (runConduit rspPipeline)
                 (runConduit reqPipeline)
 
-isEndOfLine :: Word8 -> Bool
-isEndOfLine x = x == 0 || x == 10 || x == 13
+isEndOfLineChar :: (Eq a, Num a) => a -> Bool
+isEndOfLineChar x = x == 0 || x == 10 || x == 13
+
+-- Define a new exception type
+data EndSocketException = EndSocketException
+                        deriving Show
+instance Exception EndSocketException

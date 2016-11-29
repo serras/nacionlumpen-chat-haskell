@@ -7,14 +7,10 @@ import qualified Data.IntMap as M
 
 import Types
 
--- Adapter for use within scanl
-loop' :: (ServerState, [Response]) -> Request -> (ServerState, [Response])
-loop' (s, _) = loop s
-
 -- Defines the basic loop of the server
 -- Each request affects the state and returns zero or more messages
-loop :: ServerState -> Request -> (ServerState, [Response])
-loop s (Request { from, req }) = case req of
+loop :: Request -> ServerState -> (ServerState, [Response])
+loop (Request { from, req }) s = case req of
 
   ReqNick -> obtainUserNick $ \nick ->
     ( s, [ Response (OneUser from) from (NickIs nick) ] )
