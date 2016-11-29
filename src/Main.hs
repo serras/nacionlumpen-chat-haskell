@@ -35,12 +35,12 @@ main = do
   serverIn  <- newTMChanIO
   serverOut <- newTMChanIO
   -- Start the server threads
-  let settings = serverSettings lISTEN_PORT "*"
+  let settings = serverSettings lISTENPORT "*"
   concurrently_ (backgroundServer serverIn serverOut)
                 (runTCPServer settings (initializeClient serverIn serverOut))
 
-lISTEN_PORT :: Int
-lISTEN_PORT = 1212
+lISTENPORT :: Int
+lISTENPORT = 1212
 
 -- This part listens to server requests
 -- and generates the responses
